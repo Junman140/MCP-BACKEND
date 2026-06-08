@@ -1,0 +1,33 @@
+{
+  "name": "@bio/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "nodemon --watch src --ext ts,json --exec tsx src/index.ts",
+    "dev:tsx": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@bio/shared": "workspace:*",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/jwt": "^9.0.1",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.1.0",
+    "mongoose": "^8.9.5",
+    "nodemailer": "^8.0.5",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.1",
+    "@types/nodemailer": "^8.0.0",
+    "nodemon": "^3.1.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

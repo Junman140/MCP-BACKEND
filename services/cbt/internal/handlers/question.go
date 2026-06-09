@@ -21,7 +21,7 @@ type QuestionHandler struct {
 
 func NewQuestionHandler() *QuestionHandler {
 	return &QuestionHandler{
-		Coll: db.DB.Collection("questions"),
+		Coll: db.DB.Collection("cbt_questions"),
 	}
 }
 

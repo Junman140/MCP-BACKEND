@@ -56,14 +56,14 @@ type GenerateFromTextParams struct {
 }
 
 type CurriculumUpload struct {
-	ID         string    `json:"id"`
-	TenantID   string    `json:"tenantId"`
-	CourseID   string    `json:"course_id"`
-	Title      string    `json:"title"`
-	Content    string    `json:"content"`
-	SourceType string    `json:"source_type"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID         string    `bson:"_id" json:"id"`
+	TenantID   string    `bson:"tenantId" json:"tenantId"`
+	CourseID   string    `bson:"course_id" json:"course_id"`
+	Title      string    `bson:"title" json:"title"`
+	Content    string    `bson:"content" json:"content"`
+	SourceType string    `bson:"source_type" json:"source_type"`
+	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt  time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 // Auto-grading types
@@ -116,12 +116,12 @@ type SimilarityResult struct {
 }
 
 type ModelAnswer struct {
-	ID             string    `json:"id"`
-	TenantID       string    `json:"tenantId"`
-	QuestionID     string    `json:"question_id"`
-	Content        string    `json:"content"`
-	Embedding      []float64 `json:"-"`
-	EmbeddingCount int       `json:"embedding_count"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string    `bson:"_id" json:"id"`
+	TenantID       string    `bson:"tenantId" json:"tenantId"`
+	QuestionID     string    `bson:"question_id" json:"question_id"`
+	Content        string    `bson:"content" json:"content"`
+	Embedding      []float64 `bson:"embedding" json:"-"`
+	EmbeddingCount int       `bson:"embedding_count" json:"embedding_count"`
+	CreatedAt      time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt      time.Time `bson:"updated_at" json:"updated_at"`
 }

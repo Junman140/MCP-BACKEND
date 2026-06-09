@@ -14,7 +14,7 @@ import (
 
 var (
 	OllamaURL   = getEnv("OLLAMA_URL", "http://localhost:11434")
-	OllamaModel = getEnv("OLLAMA_MODEL", "qwen2.5:0.5b")
+	OllamaModel = getEnv("OLLAMA_MODEL", "gemma3:1b")
 	HTTPTimeout = 120 * time.Second
 	mockMode    = os.Getenv("AI_MOCK_MODE") == "true"
 )
@@ -57,7 +57,7 @@ func (c *Client) Generate(prompt string, jsonMode bool) (*GenerateResponse, erro
 		Model:   c.Model,
 		Prompt:  prompt,
 		Stream:  false,
-		Options: map[string]interface{}{"num_ctx": 1024},
+		Options: map[string]interface{}{"num_ctx": 2048},
 	}
 	if jsonMode {
 		req.Format = "json"

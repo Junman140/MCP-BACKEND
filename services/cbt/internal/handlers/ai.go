@@ -29,11 +29,11 @@ type AIHandler struct {
 
 func NewAIHandler() *AIHandler {
 	return &AIHandler{
-		QuestionsColl:    db.DB.Collection("questions"),
-		CurriculaColl:    db.DB.Collection("curricula"),
-		ExamsColl:        db.DB.Collection("exams"),
-		SubmissionsColl:  db.DB.Collection("submissions_v2"),
-		ModelAnswersColl: db.DB.Collection("model_answers"),
+		QuestionsColl:    db.DB.Collection("cbt_questions"),
+		CurriculaColl:    db.DB.Collection("cbt_curricula"),
+		ExamsColl:        db.DB.Collection("cbt_exams"),
+		SubmissionsColl:  db.DB.Collection("cbt_submissions"),
+		ModelAnswersColl: db.DB.Collection("cbt_model_answers"),
 	}
 }
 
@@ -154,6 +154,12 @@ func (h *AIHandler) GenerateFromText(c *gin.Context) {
 		"raw_output": resp.Response,
 		"elapsed_ms": elapsed,
 		"model_used": ai.OllamaModel,
+		"parse_error": func() string {
+			if len(parsed.Questions) == 0 {
+				return "Model did not return a 'questions' array. Try smaller count or simpler topic."
+			}
+			return ""
+		}(),
 	})
 }
 
@@ -673,6 +679,7 @@ func convertOptions(opts []ai.Opt) []models.Option {
 // cleanJSON extracts the JSON object from a string that may have markdown fences or extra text.
 func cleanJSON(raw string) string {
 	s := strings.TrimSpace(raw)
+	// strip markdown fences
 	if start := strings.Index(s, "```json"); start != -1 {
 		s = s[start+7:]
 		if end := strings.Index(s, "```"); end != -1 {
@@ -685,7 +692,30 @@ func cleanJSON(raw string) string {
 		}
 	}
 	s = strings.TrimSpace(s)
+
+	// extract outermost {...}
 	if len(s) > 0 && s[0] == '{' {
+		// walk braces to find matching closing }
+		depth := 0
+		end := -1
+		for i, ch := range s {
+			if ch == '{' {
+				depth++
+			} else if ch == '}' {
+				depth--
+				if depth == 0 {
+					end = i + 1
+					break
+				}
+			}
+		}
+		if end > 0 {
+			s = s[:end]
+		}
+		// fix trailing comma before }
+		s = strings.ReplaceAll(s, ",}", "}")
+		// fix trailing comma before ]
+		s = strings.ReplaceAll(s, ",]", "]")
 		return s
 	}
 	if start := strings.Index(s, "{"); start != -1 {

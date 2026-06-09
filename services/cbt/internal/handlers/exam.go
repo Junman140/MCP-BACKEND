@@ -28,7 +28,7 @@ type ExamHandler struct {
 
 func NewExamHandler() *ExamHandler {
 	return &ExamHandler{
-		Collection: db.DB.Collection("exams"),
+		Collection: db.DB.Collection("cbt_exams"),
 	}
 }
 
@@ -88,7 +88,7 @@ func (h *ExamHandler) SubmitExam(c *gin.Context) {
 		return
 	}
 
-	subColl := db.DB.Collection("submissions_v2")
+	subColl := db.DB.Collection("cbt_submissions")
 
 	studentID, _ := body["student_id"].(string)
 	if studentID == "" {
@@ -328,7 +328,7 @@ func (h *ExamHandler) ListSubmissions(c *gin.Context) {
 		filter["assessment_id"] = assessmentID
 	}
 
-	cursor, err := db.DB.Collection("submissions_v2").Find(ctx, filter)
+	cursor, err := db.DB.Collection("cbt_submissions").Find(ctx, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch submissions"})
 		return
@@ -363,7 +363,7 @@ func (h *ExamHandler) GradeSubmission(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	subColl := db.DB.Collection("submissions_v2")
+	subColl := db.DB.Collection("cbt_submissions")
 
 	var sub models.Submission
 	if err := subColl.FindOne(ctx, bson.M{"_id": idStr, "tenantId": tenantID}).Decode(&sub); err != nil {
@@ -518,7 +518,7 @@ func (h *ExamHandler) UploadAssignmentFile(c *gin.Context) {
 			},
 		},
 	}
-	_, _ = db.DB.Collection("submissions_v2").UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
+	_, _ = db.DB.Collection("cbt_submissions").UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "storage_key": storageKey})
 }
@@ -531,7 +531,7 @@ func (h *ExamHandler) GetStats(c *gin.Context) {
 	defer cancel()
 
 	examsCount, _ := h.Collection.CountDocuments(ctx, bson.M{"tenantId": tenantID})
-	subsCount, _ := db.DB.Collection("submissions_v2").CountDocuments(ctx, bson.M{"tenantId": tenantID})
+	subsCount, _ := db.DB.Collection("cbt_submissions").CountDocuments(ctx, bson.M{"tenantId": tenantID})
 
 	// Fetch statistics from Biometric Backend
 	bioURL := os.Getenv("BIOMETRIC_API_URL")
@@ -580,7 +580,7 @@ func (h *ExamHandler) ListResults(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cursor, err := db.DB.Collection("submissions_v2").Find(ctx, bson.M{"tenantId": tenantID})
+	cursor, err := db.DB.Collection("cbt_submissions").Find(ctx, bson.M{"tenantId": tenantID})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch results"})
 		return
@@ -618,7 +618,7 @@ func (h *ExamHandler) PostTelemetry(c *gin.Context) {
 
 	now := time.Now()
 
-	coll := db.DB.Collection("telemetry")
+	coll := db.DB.Collection("cbt_telemetry")
 	_, err := coll.InsertOne(ctx, bson.M{
 		"student_id": tel.StudentID,
 		"exam_id":    tel.ExamID,

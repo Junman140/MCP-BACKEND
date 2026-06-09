@@ -64,7 +64,7 @@ func (h *AuthHandler) VerifyStudent(c *gin.Context) {
 		TenantID string `bson:"tenantId"`
 	}
 	var exam examLookup
-	if err := db.DB.Collection("exams").FindOne(ctx, bson.M{"_id": req.ExamID}).Decode(&exam); err != nil {
+	if err := db.DB.Collection("cbt_exams").FindOne(ctx, bson.M{"_id": req.ExamID}).Decode(&exam); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Exam not found", "detail": "The exam ID does not exist."})
 		return
 	}

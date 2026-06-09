@@ -12,33 +12,35 @@ func BuildQuestionGenPrompt(params QuestionGenParams) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("You are an expert examination question generator for a Nigerian university. ")
-	sb.WriteString("Generate high-quality, curriculum-aligned questions. ")
-	sb.WriteString("Output must be valid JSON with exactly this structure: ")
-	sb.WriteString(`{"questions":[{"type":"mcq","content":"question text here","options":[{"opt_id":"A","text":"option A"},{"opt_id":"B","text":"option B"}],"correct_opt_id":"A","points":5,"difficulty":"medium","tags":["tag1"],"topic":"topic"}]}`)
+	sb.WriteString("You are an exam question generator. Output ONLY a JSON object with a \"questions\" array. No other text. Example:`n")
+	sb.WriteString(`{"questions":[{"type":"mcq","content":"What is 2+2?","options":[{"opt_id":"A","text":"3"},{"opt_id":"B","text":"4"},{"opt_id":"C","text":"5"},{"opt_id":"D","text":"6"}],"correct_opt_id":"B","points":2,"difficulty":"easy","tags":["math"],"topic":"Arithmetic"}]}`)
 	sb.WriteString("\n\nRULES:\n")
-	sb.WriteString("- For MCQ: include exactly 4 options labeled A,B,C,D. Set correct_opt_id to the correct one.\n")
-	sb.WriteString("- For essay: set type to \"essay\", include a word_limit, omit options and correct_opt_id.\n")
-	sb.WriteString("- For file_upload: set type to \"file_upload\", omit options and correct_opt_id.\n")
-	sb.WriteString("- Content may use Markdown for formatting and LaTeX between $$ for math.\n")
-	sb.WriteString("- Points: 1-2 for easy, 2-3 for medium, 3-5 for hard.\n")
-	sb.WriteString("- Each question must have 2-4 relevant tags.\n")
-	sb.WriteString("- Output ONLY the JSON object, no preamble or explanation.\n")
+	sb.WriteString("- Top-level key MUST be \"questions\" containing an array of question objects.\n")
+	sb.WriteString("- MCQ: 4 options A,B,C,D. Include correct_opt_id.\n")
+	sb.WriteString("- Essay: type=\"essay\", include word_limit, omit options and correct_opt_id.\n")
+	sb.WriteString("- File upload: type=\"file_upload\", omit options and correct_opt_id.\n")
+	sb.WriteString("- Points: easy=1-2, medium=2-3, hard=3-5.\n")
+	sb.WriteString("- Each question needs 2-4 tags.\n")
+	sb.WriteString("- Output ONLY the JSON. No preamble, no markdown fences.\n")
 
 	if params.CourseName != "" {
-		sb.WriteString(fmt.Sprintf("\nYou are generating questions for the course: %s.\n", params.CourseName))
+		sb.WriteString(fmt.Sprintf("\nCourse: %s\n", params.CourseName))
 	}
 
 	sb.WriteString(fmt.Sprintf("\nTopic: %s\n", params.Topic))
 	sb.WriteString(fmt.Sprintf("Difficulty: %s\n", params.Difficulty))
-	sb.WriteString(fmt.Sprintf("Question types: %s\n", types))
-	sb.WriteString(fmt.Sprintf("Number of questions: %d\n", params.Count))
+	sb.WriteString(fmt.Sprintf("Types: %s\n", types))
+	sb.WriteString(fmt.Sprintf("Count: %d\n", params.Count))
 
 	if params.ContextText != "" {
-		sb.WriteString(fmt.Sprintf("\nUse the following curriculum/source material as context:\n---\n%s\n---\n", params.ContextText))
+		ctx := params.ContextText
+		if len(ctx) > 3000 {
+			ctx = ctx[:3000] + "...(truncated)"
+		}
+		sb.WriteString(fmt.Sprintf("\nContext:\n---\n%s\n---\n", ctx))
 	}
 
-	sb.WriteString("\nGenerate the questions now. Remember: JSON only, no extra text.")
+	sb.WriteString("\nGenerate the \"questions\" JSON now.")
 
 	return sb.String()
 }

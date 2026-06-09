@@ -3,10 +3,11 @@ package ai
 import "time"
 
 type GenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-	Format string `json:"format,omitempty"`
+	Model   string                 `json:"model"`
+	Prompt  string                 `json:"prompt"`
+	Stream  bool                   `json:"stream"`
+	Format  string                 `json:"format,omitempty"`
+	Options map[string]interface{} `json:"options,omitempty"`
 }
 
 type GenerateResponse struct {

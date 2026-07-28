@@ -36,14 +36,35 @@ func main() {
 	authHandler := handlers.NewAuthHandler()
 	questionHandler := handlers.NewQuestionHandler()
 	aiHandler := handlers.NewAIHandler()
+	attestHandler := handlers.NewAttestationHandler()
+
+	// Shared secrets for mobile-app-level crypto
+	mobileSecret := []byte(middleware.JwtSecret)[:32]
 
 	router := gin.Default()
+
+	// Global security headers on every response
+	router.Use(middleware.SecurityHeaders())
+
+	// Metrics collection middleware (before all routes)
+	router.Use(handlers.MetricsMiddleware())
+
+	// Health check for Docker / load balancers
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "cbt-api"})
+	})
+
+	// Prometheus metrics
+	router.GET("/metrics", handlers.MetricsHandler())
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Public auth for mobile app biometric handshake (if needed)
-		v1.POST("/auth/verify", authHandler.VerifyStudent)
+		// Public auth (rate-limited)
+		v1.POST("/auth/verify", middleware.StrictRateLimit(), authHandler.VerifyStudent)
+
+		// Device attestation (rate-limited, no JWT — mobile app handshake)
+		v1.POST("/device/attest", middleware.IPRateLimit(), attestHandler.AttestDevice)
 
 		// Protected Admin routes
 		admin := v1.Group("")
@@ -56,6 +77,9 @@ func main() {
 			admin.GET("/exams/:id/download", examHandler.DownloadExam)
 			admin.GET("/submissions", examHandler.ListSubmissions)
 			admin.PATCH("/submissions/:id/grade", examHandler.GradeSubmission)
+
+			// Device session monitoring
+			admin.GET("/device/sessions", attestHandler.GetDeviceSessions)
 
 			// Question Bank CRUD
 			admin.POST("/questions", questionHandler.CreateQuestion)
@@ -86,10 +110,17 @@ func main() {
 			admin.POST("/ai/compare-answer", aiHandler.CompareWithModelAnswer)
 		}
 
-		// Mobile app submissions
-		v1.POST("/exams/:id/submit", examHandler.SubmitExam)
-		v1.POST("/exams/:id/upload", examHandler.UploadAssignmentFile)
-		v1.POST("/telemetry", examHandler.PostTelemetry)
+		// Mobile app endpoints — anti-replay + HMAC body signing
+		mobile := v1.Group("")
+		mobile.Use(middleware.AntiReplayMiddleware(mobileSecret))
+		mobile.Use(middleware.HMACBodyVerify(mobileSecret))
+		{
+			mobile.POST("/exams/:id/submit", examHandler.SubmitExam)
+			mobile.POST("/exams/:id/upload", examHandler.UploadAssignmentFile)
+			mobile.POST("/telemetry", examHandler.PostTelemetry)
+		}
+
+		// Telemetry WebSocket (no HMAC — uses upgrade handshake)
 		v1.GET("/telemetry/stream", func(c *gin.Context) {
 			telemetry.HandleWebSocket(c.Writer, c.Request)
 		})

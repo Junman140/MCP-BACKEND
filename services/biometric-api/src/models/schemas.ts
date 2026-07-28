@@ -22,13 +22,45 @@ const UserSchema = new Schema(
     passwordHash: { type: String, required: true },
     role: {
       type: String,
-      enum: ["SUPER_ADMIN", "TENANT_ADMIN", "ENROLLER", "INVIGILATOR", "VIEWER"],
+      enum: ["SUPER_ADMIN", "TENANT_ADMIN", "ENROLLER", "INVIGILATOR", "LECTURER", "BIOMETRIC_OPERATOR", "STUDENT", "VIEWER"],
       default: "VIEWER",
     },
     displayName: String,
   },
   { timestamps: true, collection: "users" }
 );
+
+const LecturerProfileSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    userId: { type: String, required: true, ref: "User", unique: true },
+    staffId: { type: String, required: true },
+    title: String,
+    fullName: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: String,
+    departmentId: { type: String, ref: "Department", default: null },
+    qualifications: [String],
+    specializations: [String],
+    employmentType: { type: String, enum: ["full-time", "part-time", "adjunct"], default: "full-time" },
+    photoUrl: String,
+    officeHours: [
+      new Schema(
+        {
+          dayOfWeek: { type: String, enum: ["mon","tue","wed","thu","fri","sat","sun"] },
+          startTime: String,
+          endTime: String,
+          location: String,
+        },
+        { _id: false }
+      ),
+    ],
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true, collection: "lecturer_profiles" }
+);
+LecturerProfileSchema.index({ tenantId: 1, staffId: 1 }, { unique: true });
 
 const FacultySchema = new Schema(
   {
@@ -77,7 +109,9 @@ const StudentSchema = new Schema(
     faculty: String,
     department: String,
     level: String,
+    userId: { type: String, ref: "User", default: null, index: true, sparse: true },
     photoUrl: String,
+    passwordHash: String,
   },
   { timestamps: true, collection: "students" }
 );
@@ -91,6 +125,7 @@ const CourseSchema = new Schema(
     title: { type: String, required: true },
     facultyId: { type: String, ref: "Faculty", default: null },
     departmentId: { type: String, ref: "Department", default: null },
+    lecturerIds: [{ type: String, ref: "LecturerProfile" }],
     faculty: String,
     department: String,
   },
@@ -232,8 +267,228 @@ const AuditLogSchema = new Schema(
 );
 AuditLogSchema.index({ tenantId: 1, createdAt: -1 });
 
+// ── LMS schemas ──
+
+const CourseModuleSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    description: String,
+    order: { type: Number, default: 0 },
+  },
+  { timestamps: true, collection: "course_modules" }
+);
+
+const ContentItemSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    moduleId: { type: String, required: true, ref: "CourseModule", index: true },
+    title: { type: String, required: true },
+    type: { type: String, enum: ["text","video","pdf","link","quiz-ref","assignment-ref"], required: true },
+    body: String,
+    url: String,
+    mediaType: String,
+    duration: Number,
+    fileSize: Number,
+    order: { type: Number, default: 0 },
+    isPublished: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: "content_items" }
+);
+
+const AssignmentSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    description: String,
+    dueDate: Date,
+    maxScore: { type: Number, default: 100 },
+    allowLateSubmission: { type: Boolean, default: false },
+    attachments: [String],
+  },
+  { timestamps: true, collection: "lms_assignments" }
+);
+
+const QuizSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    description: String,
+    timeLimitMinutes: Number,
+    maxScore: { type: Number, default: 100 },
+    questions: [
+      new Schema(
+        {
+          text: String,
+          type: { type: String, enum: ["multiple-choice","true-false","short-answer"], required: true },
+          options: [String],
+          correctAnswer: String,
+          points: { type: Number, default: 1 },
+        },
+        { _id: true }
+      ),
+    ],
+    isPublished: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: "lms_quizzes" }
+);
+
+const QuizAttemptSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    quizId: { type: String, required: true, ref: "Quiz", index: true },
+    studentId: { type: String, required: true, ref: "Student" },
+    answers: Schema.Types.Mixed,
+    score: Number,
+    totalPoints: Number,
+    startedAt: Date,
+    submittedAt: Date,
+  },
+  { timestamps: true, collection: "quiz_attempts" }
+);
+
+const GradeEntrySchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    studentId: { type: String, required: true, ref: "Student" },
+    type: { type: String, enum: ["assignment","quiz","exam","participation"], required: true },
+    score: { type: Number, required: true },
+    maxScore: { type: Number, default: 100 },
+    letterGrade: String,
+    comments: String,
+    gradedById: { type: String, ref: "User" },
+    isApproved: { type: Boolean, default: false },
+    approvedById: { type: String, ref: "User" },
+  },
+  { timestamps: true, collection: "grade_entries" }
+);
+GradeEntrySchema.index({ tenantId: 1, studentId: 1, courseId: 1 });
+
+const AttendanceSessionSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    date: Date,
+    startTime: String,
+    endTime: String,
+    qrCode: String,
+    qrExpiresAt: Date,
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true, collection: "attendance_sessions" }
+);
+
+const AttendanceRecordSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    sessionId: { type: String, required: true, ref: "AttendanceSession", index: true },
+    studentId: { type: String, required: true, ref: "Student" },
+    status: { type: String, enum: ["present","absent","late","excused"], default: "present" },
+    checkinTime: Date,
+    method: { type: String, enum: ["qr","manual","biometric"], default: "qr" },
+  },
+  { timestamps: true, collection: "attendance_records" }
+);
+AttendanceRecordSchema.index({ sessionId: 1, studentId: 1 }, { unique: true });
+
+const DiscussionForumSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    description: String,
+    isLocked: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: "discussion_forums" }
+);
+
+const DiscussionPostSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    forumId: { type: String, required: true, ref: "DiscussionForum", index: true },
+    authorId: String,
+    authorName: String,
+    body: { type: String, required: true },
+    isPinned: { type: Boolean, default: false },
+    parentPostId: { type: String, ref: "DiscussionPost", default: null },
+  },
+  { timestamps: true, collection: "discussion_posts" }
+);
+
+const AnnouncementSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    authorId: { type: String, ref: "User", required: true },
+    title: { type: String, required: true },
+    body: { type: String, required: true },
+  },
+  { timestamps: true, collection: "announcements" }
+);
+
+const MessageSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    senderId: { type: String, required: true },
+    recipientId: { type: String, required: true, index: true },
+    subject: String,
+    body: { type: String, required: true },
+    isRead: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: "messages" }
+);
+MessageSchema.index({ tenantId: 1, senderId: 1, recipientId: 1 });
+
+const TimetableEntrySchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    title: { type: String, required: true },
+    dayOfWeek: { type: String, enum: ["mon","tue","wed","thu","fri","sat","sun"], required: true },
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+    location: String,
+    lecturerId: { type: String, ref: "LecturerProfile", default: null },
+  },
+  { timestamps: true, collection: "timetable_entries" }
+);
+
+const StudentProgressSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    studentId: { type: String, required: true, ref: "Student" },
+    courseId: { type: String, required: true, ref: "Course", index: true },
+    completedItemIds: [String],
+    lastAccessedItemId: String,
+    completionPercentage: { type: Number, default: 0 },
+  },
+  { timestamps: true, collection: "student_progress" }
+);
+StudentProgressSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
+
 export const Tenant = mongoose.models.Tenant || mongoose.model("Tenant", TenantSchema);
 export const User = mongoose.models.User || mongoose.model("User", UserSchema);
+export const LecturerProfile =
+  mongoose.models.LecturerProfile || mongoose.model("LecturerProfile", LecturerProfileSchema);
 export const Faculty = mongoose.models.Faculty || mongoose.model("Faculty", FacultySchema);
 export const Department = mongoose.models.Department || mongoose.model("Department", DepartmentSchema);
 export const AcademicSession =
@@ -270,3 +525,23 @@ const NotificationSchema = new Schema(
 NotificationSchema.index({ tenantId: 1, createdAt: -1 });
 
 export const Notification = mongoose.models.Notification || mongoose.model("Notification", NotificationSchema);
+export const CourseModule = mongoose.models.CourseModule || mongoose.model("CourseModule", CourseModuleSchema);
+export const ContentItem = mongoose.models.ContentItem || mongoose.model("ContentItem", ContentItemSchema);
+export const Assignment = mongoose.models.Assignment || mongoose.model("Assignment", AssignmentSchema);
+export const Quiz = mongoose.models.Quiz || mongoose.model("Quiz", QuizSchema);
+export const QuizAttempt = mongoose.models.QuizAttempt || mongoose.model("QuizAttempt", QuizAttemptSchema);
+export const GradeEntry = mongoose.models.GradeEntry || mongoose.model("GradeEntry", GradeEntrySchema);
+export const AttendanceSession =
+  mongoose.models.AttendanceSession || mongoose.model("AttendanceSession", AttendanceSessionSchema);
+export const AttendanceRecord =
+  mongoose.models.AttendanceRecord || mongoose.model("AttendanceRecord", AttendanceRecordSchema);
+export const DiscussionForum =
+  mongoose.models.DiscussionForum || mongoose.model("DiscussionForum", DiscussionForumSchema);
+export const DiscussionPost =
+  mongoose.models.DiscussionPost || mongoose.model("DiscussionPost", DiscussionPostSchema);
+export const Announcement = mongoose.models.Announcement || mongoose.model("Announcement", AnnouncementSchema);
+export const Message = mongoose.models.Message || mongoose.model("Message", MessageSchema);
+export const TimetableEntry =
+  mongoose.models.TimetableEntry || mongoose.model("TimetableEntry", TimetableEntrySchema);
+export const StudentProgress =
+  mongoose.models.StudentProgress || mongoose.model("StudentProgress", StudentProgressSchema);

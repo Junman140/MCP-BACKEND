@@ -35,7 +35,7 @@ export async function enrollmentRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.INVIGILATOR]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.BIOMETRIC_OPERATOR, Role.INVIGILATOR]),
       ],
     },
     async (req, reply) => {

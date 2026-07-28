@@ -12,7 +12,15 @@ export async function notificationRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN]),
+        requireRole([
+          Role.SUPER_ADMIN,
+          Role.TENANT_ADMIN,
+          Role.ENROLLER,
+          Role.INVIGILATOR,
+          Role.LECTURER,
+          Role.VIEWER,
+          Role.STUDENT,
+        ]),
       ],
     },
     async (req, reply) => {
@@ -45,10 +53,7 @@ export async function notificationRoutes(app: FastifyInstance) {
   app.get(
     "/notifications/unread-count",
     {
-      onRequest: [
-        app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN]),
-      ],
+      onRequest: [app.authenticate],
     },
     async (req, reply) => {
       const user = req.user as JwtUser;
@@ -73,7 +78,15 @@ export async function notificationRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN]),
+        requireRole([
+          Role.SUPER_ADMIN,
+          Role.TENANT_ADMIN,
+          Role.ENROLLER,
+          Role.INVIGILATOR,
+          Role.LECTURER,
+          Role.VIEWER,
+          Role.STUDENT,
+        ]),
       ],
     },
     async (req, reply) => {
@@ -98,7 +111,15 @@ export async function notificationRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN]),
+        requireRole([
+          Role.SUPER_ADMIN,
+          Role.TENANT_ADMIN,
+          Role.ENROLLER,
+          Role.INVIGILATOR,
+          Role.LECTURER,
+          Role.VIEWER,
+          Role.STUDENT,
+        ]),
       ],
     },
     async (req, reply) => {

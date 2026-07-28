@@ -11,7 +11,7 @@ export async function reportRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.VIEWER]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.BIOMETRIC_OPERATOR, Role.VIEWER]),
       ],
     },
     async (req, reply) => {
@@ -39,7 +39,7 @@ export async function reportRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.VIEWER]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.BIOMETRIC_OPERATOR, Role.VIEWER]),
       ],
     },
     async (req, reply) => {
@@ -90,7 +90,7 @@ export async function reportRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.VIEWER]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.BIOMETRIC_OPERATOR, Role.VIEWER]),
       ],
     },
     async (req, reply) => {

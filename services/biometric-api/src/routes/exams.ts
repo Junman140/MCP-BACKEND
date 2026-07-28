@@ -133,6 +133,7 @@ export async function examRoutes(app: FastifyInstance) {
           Role.ENROLLER,
           Role.INVIGILATOR,
           Role.VIEWER,
+          Role.BIOMETRIC_OPERATOR,
         ]),
       ],
     },
@@ -169,12 +170,12 @@ export async function examRoutes(app: FastifyInstance) {
           else if (e.matricNo) filter.matricNo = e.matricNo;
           else return null;
 
-          const st = await Student.findOne(filter).lean();
+          const st = await Student.findOne(filter).lean() as Record<string, any> | null;
           if (!st) return null;
 
           return ExamRosterEntry.findOneAndUpdate(
-            { examId, studentId: st._id },
-            { $set: { examId, studentId: st._id, hallLabel: e.hallLabel } },
+            { examId, studentId: st._id as string },
+            { $set: { examId, studentId: st._id as string, hallLabel: e.hallLabel } },
             { upsert: true, new: true }
           );
         })

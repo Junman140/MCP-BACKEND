@@ -37,6 +37,7 @@ export interface CourseLean {
   title: string;
   facultyId?: string | null;
   departmentId?: string | null;
+  lecturerIds?: string[];
   faculty?: string | null;
   department?: string | null;
 }

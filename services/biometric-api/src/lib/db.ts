@@ -10,7 +10,11 @@ export async function connectDb(): Promise<void> {
   }
   if (mongoose.connection.readyState === 1) return;
   if (!connecting) {
-    connecting = mongoose.connect(uri);
+    connecting = mongoose.connect(uri, {
+      maxPoolSize: 50,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
   }
   await connecting;
 }

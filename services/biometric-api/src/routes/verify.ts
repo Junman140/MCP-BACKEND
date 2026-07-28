@@ -847,7 +847,7 @@ export async function verifyRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.INVIGILATOR]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.BIOMETRIC_OPERATOR, Role.INVIGILATOR]),
       ],
     },
     async (req, reply) => {
@@ -902,6 +902,7 @@ export async function verifyRoutes(app: FastifyInstance) {
           Role.SUPER_ADMIN,
           Role.TENANT_ADMIN,
           Role.ENROLLER,
+          Role.BIOMETRIC_OPERATOR,
           Role.INVIGILATOR,
         ]),
       ],
@@ -977,7 +978,7 @@ export async function verifyRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.INVIGILATOR]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.BIOMETRIC_OPERATOR, Role.INVIGILATOR]),
       ],
     },
     async (req, reply) => {
@@ -1030,7 +1031,7 @@ export async function verifyRoutes(app: FastifyInstance) {
     {
       onRequest: [
         app.authenticate,
-        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.INVIGILATOR]),
+        requireRole([Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.BIOMETRIC_OPERATOR, Role.INVIGILATOR]),
       ],
     },
     async (req, reply) => {

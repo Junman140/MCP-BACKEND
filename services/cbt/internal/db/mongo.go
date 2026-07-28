@@ -18,7 +18,11 @@ func Connect(uri, dbName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	clientOptions := options.Client().ApplyURI(uri)
+	clientOptions := options.Client().ApplyURI(uri).
+		SetMaxPoolSize(30).
+		SetMinPoolSize(5).
+		SetConnectTimeout(10 * time.Second).
+		SetServerSelectionTimeout(5 * time.Second)
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MongoDB: %w", err)

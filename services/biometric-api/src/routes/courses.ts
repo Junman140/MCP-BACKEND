@@ -12,6 +12,7 @@ const CreateCourse = z.object({
   title: z.string().min(1),
   facultyId: z.string().optional(),
   departmentId: z.string().optional(),
+  lecturerIds: z.array(z.string()).optional(),
   faculty: z.string().optional(),
   department: z.string().optional(),
 });
@@ -30,6 +31,8 @@ export async function courseRoutes(app: FastifyInstance) {
           Role.ENROLLER,
           Role.INVIGILATOR,
           Role.VIEWER,
+          Role.LECTURER,
+          Role.STUDENT,
         ]),
       ],
     },
@@ -59,6 +62,7 @@ export async function courseRoutes(app: FastifyInstance) {
           title: body.title.trim(),
           facultyId: body.facultyId,
           departmentId: body.departmentId,
+          lecturerIds: body.lecturerIds ?? [],
           faculty: body.faculty,
           department: body.department,
         });
@@ -88,6 +92,7 @@ export async function courseRoutes(app: FastifyInstance) {
       if (body.title !== undefined) updates.title = body.title.trim();
       if (body.facultyId !== undefined) updates.facultyId = body.facultyId;
       if (body.departmentId !== undefined) updates.departmentId = body.departmentId;
+      if (body.lecturerIds !== undefined) updates.lecturerIds = body.lecturerIds;
       if (body.faculty !== undefined) updates.faculty = body.faculty;
       if (body.department !== undefined) updates.department = body.department;
       const c = await Course.findOneAndUpdate(

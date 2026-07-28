@@ -64,6 +64,8 @@ def _candidate_dll_dirs():
     if env:
         out.append(Path(env))
     out.append(_BRIDGE_DIR)
+    if getattr(sys, 'frozen', False):
+        out.append(Path(sys.executable).parent)
     return out
 
 
@@ -269,5 +271,6 @@ def capture():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    from waitress import serve
     print("Starting Futronic Capture Bridge on http://127.0.0.1:5055")
-    app.run(host='127.0.0.1', port=5055)
+    serve(app, host='127.0.0.1', port=5055)

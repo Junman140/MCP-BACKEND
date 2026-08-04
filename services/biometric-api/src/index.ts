@@ -47,6 +47,7 @@ await app.register(cors, {
 
 await app.register(jwt, {
   secret: process.env.JWT_SECRET ?? "dev-jwt-secret-change-in-production",
+  sign: { expiresIn: "24h" },
 });
 
 registerAuth(app);

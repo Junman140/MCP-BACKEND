@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { Role } from "../models/roles.js";
-import { Faculty } from "../models/schemas.js";
+import { Faculty, Department } from "../models/schemas.js";
 import { requireRole } from "../lib/auth.js";
 import { resolveTenantId, type JwtUser } from "../lib/tenantScope.js";
 import { withId, withIds } from "../lib/serialize.js";
@@ -32,6 +32,49 @@ export async function facultyRoutes(app: FastifyInstance) {
       if (!tid) return;
       const rows = await Faculty.find({ tenantId: tid }).sort({ name: 1 }).limit(500).lean();
       return withIds(rows as { _id: string }[]);
+    }
+  );
+
+  app.get(
+    "/faculties/tree",
+    {
+      onRequest: [
+        app.authenticate,
+        requireRole([
+          Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.ENROLLER, Role.INVIGILATOR,
+          Role.BIOMETRIC_OPERATOR, Role.VIEWER, Role.LECTURER,
+        ]),
+      ],
+    },
+    async (req, reply) => {
+      const user = req.user as JwtUser;
+      const tid = resolveTenantId(req, reply, user);
+      if (!tid) return;
+      const [faculties, departments] = await Promise.all([
+        Faculty.find({ tenantId: tid }).sort({ name: 1 }).lean(),
+        Department.find({ tenantId: tid }).sort({ name: 1 }).lean(),
+      ]);
+      const deptMap: Record<string, typeof departments> = {};
+      for (const d of departments) {
+        const key = d.facultyId || "__uncategorized__";
+        if (!deptMap[key]) deptMap[key] = [];
+        deptMap[key].push(d);
+      }
+      const tree = faculties.map((f) => ({
+        ...f,
+        id: f._id,
+        departments: (deptMap[f._id as string] || []).map((d) => ({ id: d._id, name: d.name })),
+      }));
+      if (deptMap["__uncategorized__"]?.length) {
+        tree.push({
+          _id: "__uncategorized__",
+          id: "__uncategorized__",
+          name: "Uncategorized",
+          tenantId: tid,
+          departments: deptMap["__uncategorized__"].map((d) => ({ id: d._id, name: d.name })),
+        } as any);
+      }
+      return tree;
     }
   );
 

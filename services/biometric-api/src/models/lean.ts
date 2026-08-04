@@ -35,8 +35,12 @@ export interface CourseLean {
   tenantId: string;
   code: string;
   title: string;
+  courseType?: string;
   facultyId?: string | null;
-  departmentId?: string | null;
+  departmentIds?: string[];
+  semester?: number;
+  level?: string | null;
+  creditUnits?: number;
   lecturerIds?: string[];
   faculty?: string | null;
   department?: string | null;

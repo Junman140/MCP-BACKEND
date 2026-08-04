@@ -123,8 +123,16 @@ const CourseSchema = new Schema(
     tenantId: { type: String, required: true, ref: "Tenant", index: true },
     code: { type: String, required: true },
     title: { type: String, required: true },
+    courseType: {
+      type: String,
+      enum: ["general", "departmental", "faculty"],
+      default: "departmental",
+    },
     facultyId: { type: String, ref: "Faculty", default: null },
-    departmentId: { type: String, ref: "Department", default: null },
+    departmentIds: [{ type: String, ref: "Department" }],
+    semester: { type: Number, min: 1, max: 2, default: 1 },
+    level: { type: String, default: null },
+    creditUnits: { type: Number, default: 3 },
     lecturerIds: [{ type: String, ref: "LecturerProfile" }],
     faculty: String,
     department: String,
@@ -132,6 +140,7 @@ const CourseSchema = new Schema(
   { timestamps: true, collection: "courses" }
 );
 CourseSchema.index({ tenantId: 1, code: 1 }, { unique: true });
+CourseSchema.index({ tenantId: 1, facultyId: 1, semester: 1, courseType: 1 });
 
 /** Student registered for a course in a given academic year & semester (sitting eligibility). */
 const CourseRegistrationSchema = new Schema(

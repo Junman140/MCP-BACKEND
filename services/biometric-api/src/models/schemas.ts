@@ -554,3 +554,182 @@ export const TimetableEntry =
   mongoose.models.TimetableEntry || mongoose.model("TimetableEntry", TimetableEntrySchema);
 export const StudentProgress =
   mongoose.models.StudentProgress || mongoose.model("StudentProgress", StudentProgressSchema);
+
+// ── Payment / Fee schemas ──
+
+const FeeConfigSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    feeType: {
+      type: String,
+      enum: ["school_fees", "course_registration", "departmental_dues"],
+      required: true,
+    },
+    label: { type: String, required: true },
+    amount: { type: Number, required: true },
+    serviceFee: { type: Number, required: true, default: 500 },
+    academicSessionId: { type: String, ref: "AcademicSession", default: null },
+    level: { type: String, default: null },
+    departmentId: { type: String, ref: "Department", default: null },
+    facultyId: { type: String, ref: "Faculty", default: null },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true, collection: "fee_configs" }
+);
+FeeConfigSchema.index({ tenantId: 1, feeType: 1, level: 1 });
+
+const InvoiceSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    studentId: { type: String, required: true, ref: "Student", index: true },
+    feeType: {
+      type: String,
+      enum: ["school_fees", "course_registration", "departmental_dues"],
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    serviceFee: { type: Number, required: true },
+    totalAmount: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["AWAITING_PAYMENT", "COLLECTED", "REMITTING", "REMITTED", "COMPLETE", "FAILED", "EXPIRED"],
+      default: "AWAITING_PAYMENT",
+      index: true,
+    },
+    academicSessionId: { type: String, ref: "AcademicSession", default: null },
+    academicYear: { type: String, default: null },
+    semester: { type: Number, min: 1, max: 2, default: null },
+    virtualAccountNumber: { type: String, index: true },
+    virtualAccountBank: { type: String },
+    pspReference: { type: String, unique: true, sparse: true },
+    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify"] },
+    courseIds: [{ type: String }],
+    meta: Schema.Types.Mixed,
+    paidAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null },
+  },
+  { timestamps: true, collection: "invoices" }
+);
+InvoiceSchema.index({ tenantId: 1, studentId: 1, status: 1 });
+InvoiceSchema.index({ pspReference: 1 }, { unique: true, sparse: true });
+
+const PaymentTransactionSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    invoiceId: { type: String, required: true, ref: "Invoice", index: true },
+    amount: { type: Number, required: true },
+    direction: {
+      type: String,
+      enum: ["INBOUND", "OUTBOUND"],
+      required: true,
+    },
+    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify", "remita"] },
+    pspReference: { type: String },
+    gatewayResponse: { type: String },
+    status: {
+      type: String,
+      enum: ["PENDING", "SUCCESS", "FAILED"],
+      default: "PENDING",
+    },
+    remittanceRRR: { type: String },
+    idempotencyKey: { type: String, unique: true, sparse: true },
+    meta: Schema.Types.Mixed,
+  },
+  { timestamps: true, collection: "payment_transactions" }
+);
+PaymentTransactionSchema.index({ invoiceId: 1, createdAt: -1 });
+PaymentTransactionSchema.index({ tenantId: 1, createdAt: -1 });
+
+const LedgerEntrySchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    invoiceId: { type: String, required: true, ref: "Invoice", index: true },
+    event: {
+      type: String,
+      enum: ["INVOICE_CREATED", "COLLECTED", "REMITTING", "REMITTED", "COMPLETE", "FAILED", "RETRY", "RECONCILED"],
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    previousHash: { type: String, required: true },
+    currentHash: { type: String, required: true },
+    transactionId: { type: String, ref: "PaymentTransaction", default: null },
+    data: Schema.Types.Mixed,
+  },
+  { timestamps: true, collection: "ledger_entries" }
+);
+LedgerEntrySchema.index({ invoiceId: 1, createdAt: 1 });
+LedgerEntrySchema.index({ tenantId: 1, createdAt: -1 });
+
+const ReceiptSchema = new Schema(
+  {
+    _id: idString(),
+    tenantId: { type: String, required: true, ref: "Tenant", index: true },
+    invoiceId: { type: String, required: true, ref: "Invoice" },
+    studentId: { type: String, required: true, ref: "Student" },
+    receiptNumber: { type: String, required: true, unique: true },
+    amount: { type: Number, required: true },
+    serviceFee: { type: Number, required: true },
+    totalAmount: { type: Number, required: true },
+    feeType: { type: String, required: true },
+    paymentDate: { type: Date, default: () => new Date() },
+    pspReference: { type: String },
+    rrrReference: { type: String },
+    isDownloaded: { type: Boolean, default: false },
+    storagePath: { type: String },
+  },
+  { timestamps: true, collection: "receipts" }
+);
+ReceiptSchema.index({ tenantId: 1, studentId: 1, createdAt: -1 });
+ReceiptSchema.index({ invoiceId: 1 }, { unique: true });
+
+const FCMTokenSchema = new Schema(
+  {
+    _id: idString(),
+    userId: { type: String, required: true, ref: "User", index: true },
+    token: { type: String, required: true },
+    deviceType: { type: String, enum: ["android", "ios", "web"] },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true, collection: "fcm_tokens" }
+);
+FCMTokenSchema.index({ userId: 1, token: 1 }, { unique: true });
+FCMTokenSchema.index({ token: 1 });
+
+export const FeeConfig = mongoose.models.FeeConfig || mongoose.model("FeeConfig", FeeConfigSchema);
+export const Invoice = mongoose.models.Invoice || mongoose.model("Invoice", InvoiceSchema);
+export const PaymentTransaction =
+  mongoose.models.PaymentTransaction || mongoose.model("PaymentTransaction", PaymentTransactionSchema);
+export const LedgerEntry = mongoose.models.LedgerEntry || mongoose.model("LedgerEntry", LedgerEntrySchema);
+export const Receipt = mongoose.models.Receipt || mongoose.model("Receipt", ReceiptSchema);
+export const FCMToken = mongoose.models.FCMToken || mongoose.model("FCMToken", FCMTokenSchema);
+
+const JobQueueSchema = new Schema(
+  {
+    _id: idString(),
+    type: { type: String, required: true, index: true },
+    status: {
+      type: String,
+      enum: ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "DEAD"],
+      default: "PENDING",
+      index: true,
+    },
+    tenantId: { type: String, ref: "Tenant", index: true },
+    invoiceId: { type: String, ref: "Invoice", index: true },
+    priority: { type: Number, default: 0 },
+    attempts: { type: Number, default: 0 },
+    maxAttempts: { type: Number, default: 5 },
+    nextAttemptAt: { type: Date, default: () => new Date() },
+    lastError: { type: String, default: null },
+    data: Schema.Types.Mixed,
+    processingStartedAt: Date,
+    completedAt: Date,
+  },
+  { timestamps: true, collection: "job_queue" }
+);
+JobQueueSchema.index({ status: 1, nextAttemptAt: 1 });
+
+export const JobQueue = mongoose.models.JobQueue || mongoose.model("JobQueue", JobQueueSchema);

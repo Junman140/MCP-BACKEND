@@ -36,6 +36,10 @@ import { lmsProgressRoutes } from "./routes/lms-progress.js";
 import { lmsAnalyticsRoutes } from "./routes/lms-analytics.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { studentDashboardRoutes } from "./routes/student-dashboard.js";
+import { paymentRoutes } from "./routes/payments.js";
+import { startWorker } from "./lib/jobs.js";
+import { startReminderScheduler } from "./lib/reminders.js";
+import { startReconciliationScheduler } from "./lib/reconciliation.js";
 
 await connectDb();
 
@@ -86,6 +90,7 @@ await app.register(lmsProgressRoutes);
 await app.register(lmsAnalyticsRoutes);
 await app.register(metricsRoutes);
 await app.register(studentDashboardRoutes);
+await app.register(paymentRoutes);
 
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -122,3 +127,8 @@ fetch(`${faceUrl}/health`, { signal: AbortSignal.timeout(2500) })
       msg: "face service not reachable — start Python face-service (port 5056) for face recognition",
     })
   );
+
+// ── Payment system background workers ──
+startWorker();
+startReminderScheduler();
+startReconciliationScheduler();

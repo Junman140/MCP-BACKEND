@@ -60,20 +60,14 @@ export async function courseRoutes(app: FastifyInstance) {
         ];
       }
 
-      const page = Math.max(1, parseInt(q.page || "1", 10) || 1);
-      const limit = Math.min(500, Math.max(1, parseInt(q.limit || "100", 10) || 100));
-      const skip = (page - 1) * limit;
+      const limit = Math.min(500, Math.max(1, parseInt(q.limit || "500", 10) || 500));
 
-      const [rows, total] = await Promise.all([
-        Course.find(filter)
-          .sort({ semester: 1, courseType: 1, code: 1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        Course.countDocuments(filter),
-      ]);
+      const rows = await Course.find(filter)
+        .sort({ semester: 1, courseType: 1, code: 1 })
+        .limit(limit)
+        .lean();
 
-      return { data: withIds(rows as { _id: string }[]), total, page, limit };
+      return withIds(rows as { _id: string }[]);
     }
   );
 

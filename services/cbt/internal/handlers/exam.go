@@ -608,6 +608,75 @@ func (h *ExamHandler) ListResults(c *gin.Context) {
 
 func ptrBool(v bool) *bool { return &v }
 
+// ListStudentResults handles GET /api/v1/results?student_id=...&exam_id=...
+// (mobile group: HMAC-signed, no JWT). Returns only the requested student's own
+// submissions with grade and exam summary — never correct answers.
+func (h *ExamHandler) ListStudentResults(c *gin.Context) {
+	studentID := c.Query("student_id")
+	if studentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "student_id is required"})
+		return
+	}
+	examID := c.Query("exam_id")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.M{"student_id": studentID}
+	if examID != "" {
+		filter["assessment_id"] = examID
+	}
+
+	cursor, err := db.DB.Collection("cbt_submissions").Find(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch results"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var subs []models.Submission
+	if err := cursor.All(ctx, &subs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode results"})
+		return
+	}
+
+	type resultOut struct {
+		ID            string                  `json:"id"`
+		AssessmentID  string                  `json:"assessment_id"`
+		ExamTitle     string                  `json:"exam_title"`
+		Status        string                  `json:"status"`
+		SubmittedAt   *time.Time              `json:"submitted_at"`
+		MaxScore      int64                   `json:"max_score"`
+		Grade         *models.SubmissionGrade `json:"grade,omitempty"`
+	}
+
+	// Cache exam metadata to avoid repeated lookups.
+	examCache := map[string]models.Exam{}
+	out := make([]resultOut, 0, len(subs))
+	for _, s := range subs {
+		exam, ok := examCache[s.AssessmentID]
+		if !ok {
+			db.DB.Collection("cbt_exams").FindOne(ctx, bson.M{"_id": s.AssessmentID}).Decode(&exam)
+			examCache[s.AssessmentID] = exam
+		}
+		var maxScore int64
+		for _, q := range exam.AllQuestions() {
+			maxScore += q.Points
+		}
+		out = append(out, resultOut{
+			ID:           s.ID,
+			AssessmentID: s.AssessmentID,
+			ExamTitle:    exam.Metadata.Title,
+			Status:       string(s.Status),
+			SubmittedAt:  s.SubmittedAt,
+			MaxScore:     maxScore,
+			Grade:        s.Grade,
+		})
+	}
+
+	c.JSON(http.StatusOK, out)
+}
+
 // PostTelemetry handles the POST /api/v1/telemetry request
 func (h *ExamHandler) PostTelemetry(c *gin.Context) {
 	var tel struct {

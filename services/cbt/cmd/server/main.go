@@ -123,9 +123,10 @@ func main() {
 		mobile.Use(middleware.AntiReplayMiddleware(mobileSecret))
 		mobile.Use(middleware.HMACBodyVerify(mobileSecret))
 		{
-			mobile.POST("/exams/:id/submit", examHandler.SubmitExam)
-			mobile.POST("/exams/:id/upload", examHandler.UploadAssignmentFile)
-			mobile.POST("/telemetry", examHandler.PostTelemetry)
+		mobile.POST("/exams/:id/submit", examHandler.SubmitExam)
+		mobile.POST("/exams/:id/upload", examHandler.UploadAssignmentFile)
+		mobile.POST("/telemetry", examHandler.PostTelemetry)
+		mobile.GET("/student/results", examHandler.ListStudentResults)
 		}
 
 		// Telemetry WebSocket — requires a valid token via the `token` query param

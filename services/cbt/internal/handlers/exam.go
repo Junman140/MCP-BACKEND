@@ -379,12 +379,13 @@ func (h *ExamHandler) GradeSubmission(c *gin.Context) {
 	}
 
 	// Build a lookup of correct answers and points by question ID.
+	// AllQuestions() flattens legacy questions, sections, and streams.
 	type questionKey struct {
 		CorrectOptID string
 		Points       int64
 	}
 	qLookup := make(map[string]questionKey)
-	for _, q := range exam.Questions {
+	for _, q := range exam.AllQuestions() {
 		qLookup[q.ID] = questionKey{CorrectOptID: q.CorrectID, Points: q.Points}
 	}
 

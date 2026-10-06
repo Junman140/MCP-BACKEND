@@ -56,13 +56,38 @@ type Question struct {
 	Tags       []string `bson:"tags" json:"tags"`
 }
 
+// Section is a named, ordered grouping of questions within an exam (or stream).
+// Sections let an exam be split into parts (e.g. "Part A - MCQ", "Part B - Essay")
+// each with its own instructions, optional time allocation, and shuffle rule.
+type Section struct {
+	ID               string     `bson:"sec_id" json:"sec_id"`
+	Title            string     `bson:"title" json:"title"`
+	Description      string     `bson:"description,omitempty" json:"description,omitempty"`
+	DurationMinutes  int        `bson:"duration_minutes,omitempty" json:"duration_minutes,omitempty"` // 0 = inherit exam duration
+	ShuffleQuestions bool       `bson:"shuffle_questions,omitempty" json:"shuffle_questions,omitempty"`
+	Order            int        `bson:"order" json:"order"`
+	Questions        []Question `bson:"questions" json:"questions"`
+}
+
+// Stream is an alternate variant (sitting) of an exam used to reduce collusion:
+// different rows/groups of students can be assigned different streams. Each stream
+// contains its own ordered sections. When streams are present, a student is
+// assigned to one stream (default: the first) and only sees its sections.
+type Stream struct {
+	ID       string    `bson:"str_id" json:"str_id"`
+	Name     string    `bson:"name" json:"name"`
+	Sections []Section `bson:"sections" json:"sections"`
+}
+
 type Exam struct {
 	ID                string          `bson:"_id,omitempty" json:"id"`
 	TenantID          string          `bson:"tenantId" json:"tenantId"`
 	Type              AssessmentType  `bson:"type" json:"type"`
 	Rules             AssessmentRules `bson:"rules" json:"rules"`
 	Metadata          ExamMetadata    `bson:"metadata" json:"metadata"`
-	Questions         []Question      `bson:"questions" json:"questions"`
+	Questions         []Question      `bson:"questions,omitempty" json:"questions,omitempty"`   // legacy flat list
+	Sections          []Section       `bson:"sections,omitempty" json:"sections,omitempty"`      // structured, single-stream
+	Streams           []Stream        `bson:"streams,omitempty" json:"streams,omitempty"`        // multiple variants
 	CourseID          string          `bson:"course_id,omitempty" json:"course_id,omitempty"`
 	CourseName        string          `bson:"course_name,omitempty" json:"course_name,omitempty"`
 	FacultyID         string          `bson:"faculty_id,omitempty" json:"faculty_id,omitempty"`
@@ -73,4 +98,20 @@ type Exam struct {
 	Semester          string          `bson:"semester,omitempty" json:"semester,omitempty"`
 	AcademicSessionID string          `bson:"academic_session_id,omitempty" json:"academic_session_id,omitempty"`
 	CreatedAt         time.Time       `bson:"created_at" json:"created_at"`
+}
+
+// AllQuestions returns every question regardless of how the exam is structured
+// (legacy flat list, sections, or streams). Used by grading/scoring.
+func (e *Exam) AllQuestions() []Question {
+	out := make([]Question, 0)
+	out = append(out, e.Questions...)
+	for _, s := range e.Sections {
+		out = append(out, s.Questions...)
+	}
+	for _, st := range e.Streams {
+		for _, sec := range st.Sections {
+			out = append(out, sec.Questions...)
+		}
+	}
+	return out
 }

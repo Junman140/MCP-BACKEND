@@ -695,10 +695,15 @@ func (h *ExamHandler) PostTelemetry(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Resolve tenant from the exam so telemetry can be scoped per tenant.
+	var exam models.Exam
+	_ = h.Collection.FindOne(ctx, bson.M{"_id": tel.ExamID}).Decode(&exam)
+
 	now := time.Now()
 
 	coll := db.DB.Collection("cbt_telemetry")
 	_, err := coll.InsertOne(ctx, bson.M{
+		"tenantId":   exam.TenantID,
 		"student_id": tel.StudentID,
 		"exam_id":    tel.ExamID,
 		"status":     tel.Status,
@@ -723,6 +728,89 @@ func (h *ExamHandler) PostTelemetry(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "logged"})
+}
+
+// GetProctoringReport handles GET /api/v1/proctoring/report?exam_id=... (admin).
+// Aggregates stored telemetry (cbt_telemetry) into a per-student proctoring
+// summary: violation counts, last status, first/last seen. Useful for invigilators
+// to review after an exam (the live WebSocket only shows the active session).
+func (h *ExamHandler) GetProctoringReport(c *gin.Context) {
+	tenantID := c.GetString("tenantId")
+	examID := c.Query("exam_id")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"tenantId": tenantID}
+	if examID != "" {
+		filter["exam_id"] = examID
+	}
+
+	cursor, err := db.DB.Collection("cbt_telemetry").Find(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch proctoring data"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var docs []bson.M
+	if err := cursor.All(ctx, &docs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode proctoring data"})
+		return
+	}
+
+	type studentReport struct {
+		StudentID      string    `json:"student_id"`
+		ExamID         string    `json:"exam_id"`
+		Violations     int       `json:"violations"`
+		ViolationKinds []string  `json:"violation_kinds"`
+		LastStatus     string    `json:"last_status"`
+		FocusLost      int       `json:"focus_lost"`
+		FirstSeen      time.Time `json:"first_seen"`
+		LastSeen       time.Time `json:"last_seen"`
+	}
+
+	agg := map[string]*studentReport{}
+	for _, d := range docs {
+		sid, _ := d["student_id"].(string)
+		eid, _ := d["exam_id"].(string)
+		status, _ := d["status"].(string)
+		focus, _ := d["focus"].(bool)
+		violation, _ := d["violation"].(string)
+		ts, _ := d["timestamp"].(time.Time)
+
+		key := sid + "|" + eid
+		r, ok := agg[key]
+		if !ok {
+			r = &studentReport{StudentID: sid, ExamID: eid, FirstSeen: ts, LastSeen: ts}
+			agg[key] = r
+		}
+		r.LastStatus = status
+		if ts.Before(r.FirstSeen) {
+			r.FirstSeen = ts
+		}
+		if ts.After(r.LastSeen) {
+			r.LastSeen = ts
+		}
+		if violation != "" {
+			r.Violations++
+			r.ViolationKinds = append(r.ViolationKinds, violation)
+		}
+		if !focus {
+			r.FocusLost++
+		}
+	}
+
+	out := make([]studentReport, 0, len(agg))
+	for _, r := range agg {
+		out = append(out, *r)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exam_id":  examID,
+		"students": out,
+		"total":    len(out),
+	})
 }
 
 // UploadMedia handles POST /api/v1/media/upload (admin).

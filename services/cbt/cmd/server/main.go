@@ -79,6 +79,7 @@ func main() {
 		))
 		{
 			admin.GET("/stats", examHandler.GetStats)
+			admin.GET("/proctoring/report", examHandler.GetProctoringReport)
 			admin.GET("/results", examHandler.ListResults)
 			admin.GET("/exams", examHandler.ListExams)
 			admin.POST("/exams", examHandler.CreateExam)

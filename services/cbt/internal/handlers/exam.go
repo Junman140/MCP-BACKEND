@@ -158,9 +158,12 @@ func (h *ExamHandler) SubmitExam(c *gin.Context) {
 		if sub.Attempt <= 0 {
 			sub.Attempt = 1
 		}
+		// A payload carrying the full answer set is a final submission.
 		if sub.Status == "" {
-			sub.Status = models.SubmissionStatusInProgress
+			sub.Status = models.SubmissionStatusSubmitted
 		}
+		submittedAt := now
+		sub.SubmittedAt = &submittedAt
 		if sub.StartedAt.IsZero() {
 			sub.StartedAt = now
 		}
@@ -412,9 +415,14 @@ func (h *ExamHandler) GradeSubmission(c *gin.Context) {
 		mergedPerQ[k] = v
 	}
 
-	finalTotal := autoTotal
+	// Final total = sum of all per-question scores (MCQ auto + manual essay).
+	// An explicit absolute `total_score` from the UI overrides the computed sum.
+	finalTotal := int64(0)
+	for _, v := range mergedPerQ {
+		finalTotal += v
+	}
 	if req.TotalScore > 0 {
-		finalTotal = req.TotalScore + autoTotal
+		finalTotal = req.TotalScore
 	}
 
 	now := time.Now()

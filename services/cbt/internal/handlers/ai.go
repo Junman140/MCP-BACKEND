@@ -384,7 +384,9 @@ func (h *AIHandler) GradeSubmission(c *gin.Context) {
 		CorrectID string
 	}
 	qLookup := make(map[string]qKey)
-	for _, q := range exam.Questions {
+	// AllQuestions() flattens legacy questions, sections, and streams so AI
+	// grading sees every question regardless of how the exam is structured.
+	for _, q := range exam.AllQuestions() {
 		qLookup[q.ID] = qKey{Content: q.Content, Points: q.Points, WordLimit: q.WordLimit, CorrectID: q.CorrectID}
 	}
 
@@ -406,7 +408,11 @@ func (h *AIHandler) GradeSubmission(c *gin.Context) {
 	client := ai.NewClient()
 	perFeedback := make(map[string]string)
 	confidences := make(map[string]float64)
+	// Maximum possible score = sum of points across every question.
 	var maxScore int64
+	for _, q := range exam.AllQuestions() {
+		maxScore += q.Points
+	}
 	start := time.Now()
 
 	for _, ans := range sub.Answers {
@@ -441,11 +447,9 @@ func (h *AIHandler) GradeSubmission(c *gin.Context) {
 
 		autoPerQ[ans.QuestionID] = gr.Score
 		autoTotal += gr.Score
-		maxScore += qk.Points
 		perFeedback[ans.QuestionID] = gr.Feedback
 		confidences[ans.QuestionID] = gr.Confidence
 	}
-	maxScore += autoTotal
 
 	elapsed := time.Since(start).Milliseconds()
 
@@ -469,7 +473,15 @@ func (h *AIHandler) GradeSubmission(c *gin.Context) {
 		},
 	}
 
-	h.SubmissionsColl.UpdateOne(ctx, bson.M{"_id": subID, "tenantId": tenantID}, update)
+	res, err := h.SubmissionsColl.UpdateOne(ctx, bson.M{"_id": subID, "tenantId": tenantID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save AI grade"})
+		return
+	}
+	if res.MatchedCount == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Submission not found"})
+		return
+	}
 
 	c.JSON(http.StatusOK, ai.SubmissionGradeResult{
 		SubmissionID: subID,

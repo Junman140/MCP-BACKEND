@@ -11,7 +11,7 @@ const readRoles = [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.LECTURER, Role.VIEW
 const writeRoles = [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.LECTURER];
 
 export async function lmsGradesRoutes(app: FastifyInstance) {
-  app.get("/grades", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get("/grades", { onRequest: [app.authenticate, requireRole(readRoles)] }, async (req, reply) => {
     const user = req.user as JwtUser;
     const tid = resolveTenantId(req, reply, user);
     if (!tid) return;

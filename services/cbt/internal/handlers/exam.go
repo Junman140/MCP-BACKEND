@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"mcp-cbt-backend/internal/db"
@@ -677,9 +678,42 @@ func (h *ExamHandler) UploadMedia(c *gin.Context) {
 	})
 }
 
-// ServeMedia handles GET /api/v1/media/:filename (public).
+// ServeMedia handles GET /api/v1/media/*filename (public). The path is strictly
+// confined to the uploads/media directory to prevent path traversal (e.g. reading
+// .env, source, or other tenants' files).
 func (h *ExamHandler) ServeMedia(c *gin.Context) {
-	filename := c.Param("filename")
-	filePath := filepath.Join("./uploads/media", filename)
-	c.File(filePath)
+	filename := c.Param("filename") // gin wildcard includes the leading "/"
+
+	// Normalize and reject any attempt to escape the media root.
+	cleaned := filepath.Clean("/" + filename)
+	if cleaned == "/" || strings.HasPrefix(cleaned, "/..") {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	base := "./uploads/media"
+	full := filepath.Join(base, cleaned)
+
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	absFull, err := filepath.Abs(full)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if absFull != absBase && !strings.HasPrefix(absFull, absBase+string(os.PathSeparator)) {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	info, err := os.Stat(full)
+	if err != nil || info.IsDir() {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	c.File(full)
 }

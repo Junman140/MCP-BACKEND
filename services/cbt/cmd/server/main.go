@@ -21,6 +21,11 @@ import (
 func main() {
 	_ = godotenv.Load()
 
+	// Fail closed if the JWT signing secret is not configured.
+	if len(middleware.JwtSecret) == 0 {
+		log.Fatalf("JWT_SECRET must be set in the environment")
+	}
+
 	// Connect to MongoDB
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
@@ -66,9 +71,12 @@ func main() {
 		// Device attestation (rate-limited, no JWT — mobile app handshake)
 		v1.POST("/device/attest", middleware.IPRateLimit(), attestHandler.AttestDevice)
 
-		// Protected Admin routes
+		// Protected Admin routes — restricted to staff roles. Students and lecturers
+		// must not be able to reach exam management, the question bank, or grading.
 		admin := v1.Group("")
-		admin.Use(middleware.AuthMiddleware())
+		admin.Use(middleware.AuthMiddleware(), middleware.RequireRole(
+			"SUPER_ADMIN", "TENANT_ADMIN", "ENROLLER", "INVIGILATOR", "VIEWER",
+		))
 		{
 			admin.GET("/stats", examHandler.GetStats)
 			admin.GET("/results", examHandler.ListResults)
@@ -120,8 +128,13 @@ func main() {
 			mobile.POST("/telemetry", examHandler.PostTelemetry)
 		}
 
-		// Telemetry WebSocket (no HMAC — uses upgrade handshake)
+		// Telemetry WebSocket — requires a valid token via the `token` query param
+		// (browser WebSocket APIs cannot set Authorization headers).
 		v1.GET("/telemetry/stream", func(c *gin.Context) {
+			if _, err := middleware.ValidateToken(c.Query("token")); err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+				return
+			}
 			telemetry.HandleWebSocket(c.Writer, c.Request)
 		})
 		v1.GET("/media/*filename", examHandler.ServeMedia)

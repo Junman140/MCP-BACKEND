@@ -49,8 +49,13 @@ await app.register(cors, {
   origin: true,
 });
 
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET environment variable must be set");
+}
+
 await app.register(jwt, {
-  secret: process.env.JWT_SECRET ?? "dev-jwt-secret-change-in-production",
+  secret: jwtSecret,
   sign: { expiresIn: "24h" },
 });
 

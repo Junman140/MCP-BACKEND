@@ -3,7 +3,7 @@ import { Invoice, PaymentTransaction } from "../models/schemas.js";
 import { appendEntry } from "./ledger.js";
 import { enqueueRemittance } from "./jobs.js";
 
-const PSP_PROVIDER = (process.env.PSP_PROVIDER ?? "paystack") as "paystack" | "flutterwave" | "monnify";
+const PSP_PROVIDER = (process.env.PSP_PROVIDER ?? "mock") as "paystack" | "flutterwave" | "monnify" | "mock";
 
 interface VirtualAccountRequest {
   email: string;
@@ -61,8 +61,17 @@ export async function createVirtualAccount(args: {
   const secretKey = process.env.PSP_SECRET_KEY;
   const baseUrl = process.env.PSP_BASE_URL;
 
-  if (!secretKey || !baseUrl) {
-    throw new Error(`PSP not configured: set PSP_SECRET_KEY and PSP_BASE_URL`);
+  // Mock gateway: no real PSP keys required. Returns a deterministic fake
+  // virtual account so the end-to-end payment flow works in dev/demo.
+  if (PSP_PROVIDER === "mock" || !secretKey || !baseUrl) {
+    const accountNumber = `MOCK${(parseInt(args.invoiceId.replace(/\D/g, "") || "0", 10) % 100000000)
+      .toString()
+      .padStart(8, "0")}`;
+    return {
+      accountNumber,
+      bankName: "Mock Gateway Bank",
+      reference,
+    };
   }
 
   switch (PSP_PROVIDER) {
@@ -363,4 +372,29 @@ async function finalizePayment(args: {
   });
 
   return { processed: true, invoiceId: invoice._id };
+}
+
+/**
+ * simulateMockPayment drives the end-to-end payment flow without a real PSP.
+ * Used by the demo/mock gateway so a student can "pay" an invoice and have it
+ * marked COLLECTED with a receipt generated, exactly like a real webhook would.
+ */
+export async function simulateMockPayment(invoiceId: string): Promise<{
+  processed: boolean;
+  reason?: string;
+  invoiceId?: string;
+}> {
+  const invoice = await Invoice.findOne({ _id: invoiceId, status: "AWAITING_PAYMENT" });
+  if (!invoice) {
+    return { processed: false, reason: "Invoice not found or already paid" };
+  }
+
+  const reference = (invoice.pspReference as string) || `MOCK-${invoiceId.slice(0, 12)}`;
+  return finalizePayment({
+    invoice: invoice.toObject() as Record<string, any>,
+    provider: "mock",
+    transactionRef: reference,
+    amount: (invoice.totalAmount as number) ?? (invoice.amount as number),
+    gatewayResponse: "mock-gateway:simulated",
+  });
 }

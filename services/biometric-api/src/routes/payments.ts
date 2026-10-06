@@ -12,7 +12,7 @@ import {
 import { requireRole } from "../lib/auth.js";
 import { resolveTenantId, type JwtUser } from "../lib/tenantScope.js";
 import { withId, withIds } from "../lib/serialize.js";
-import { createVirtualAccount, verifyWebhook, processPaymentWebhook } from "../lib/payment.js";
+import { createVirtualAccount, verifyWebhook, processPaymentWebhook, simulateMockPayment } from "../lib/payment.js";
 import { verifyChain, appendEntry } from "../lib/ledger.js";
 import { getReceiptPdf } from "../lib/receipt.js";
 
@@ -170,7 +170,7 @@ export async function paymentRoutes(app: FastifyInstance) {
         virtualAccountNumber,
         virtualAccountBank,
         pspReference,
-        pspProvider: (process.env.PSP_PROVIDER ?? "paystack") as "paystack" | "flutterwave" | "monnify",
+        pspProvider: (process.env.PSP_PROVIDER ?? "mock") as "paystack" | "flutterwave" | "monnify" | "mock",
         expiresAt,
       });
 
@@ -183,6 +183,36 @@ export async function paymentRoutes(app: FastifyInstance) {
       });
 
       return withId(invoice.toObject() as { _id: string });
+    }
+  );
+
+  // ── Mock gateway payment (demo / dev, no real PSP) ──
+  app.post(
+    "/payments/invoices/:id/mock-pay",
+    {
+      onRequest: [app.authenticate, requireRole([Role.STUDENT, Role.SUPER_ADMIN, Role.TENANT_ADMIN])],
+    },
+    async (req, reply) => {
+      const user = req.user as JwtUser;
+      const tid = resolveTenantId(req, reply, user);
+      if (!tid) return;
+      const { id } = req.params as { id: string };
+
+      const invoice = await Invoice.findOne({ _id: id, tenantId: tid }).lean() as Record<string, any> | null;
+      if (!invoice) return reply.code(404).send({ error: "Invoice not found" });
+
+      if (user.role === Role.STUDENT) {
+        const student = await Student.findOne({ tenantId: tid, userId: user.sub }).lean() as Record<string, any> | null;
+        if (!student || (student._id as string) !== (invoice.studentId as string)) {
+          return reply.code(403).send({ error: "This invoice does not belong to you" });
+        }
+      }
+
+      const result = await simulateMockPayment(id);
+      if (!result.processed) {
+        return reply.code(400).send({ error: result.reason ?? "Payment could not be completed" });
+      }
+      return { ok: true, ...result };
     }
   );
 

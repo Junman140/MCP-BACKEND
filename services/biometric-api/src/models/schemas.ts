@@ -604,7 +604,7 @@ const InvoiceSchema = new Schema(
     virtualAccountNumber: { type: String, index: true },
     virtualAccountBank: { type: String },
     pspReference: { type: String, unique: true, sparse: true },
-    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify"] },
+    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify", "mock"] },
     courseIds: [{ type: String }],
     meta: Schema.Types.Mixed,
     paidAt: { type: Date, default: null },
@@ -626,7 +626,7 @@ const PaymentTransactionSchema = new Schema(
       enum: ["INBOUND", "OUTBOUND"],
       required: true,
     },
-    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify", "remita"] },
+    pspProvider: { type: String, enum: ["paystack", "flutterwave", "monnify", "remita", "mock"] },
     pspReference: { type: String },
     gatewayResponse: { type: String },
     status: {

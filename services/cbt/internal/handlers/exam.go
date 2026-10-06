@@ -15,6 +15,7 @@ import (
 	"mcp-cbt-backend/internal/models"
 	"mcp-cbt-backend/internal/packaging"
 	"mcp-cbt-backend/internal/telemetry"
+	"mcp-cbt-backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -46,6 +47,13 @@ func (h *ExamHandler) DownloadExam(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Exam not found"})
 		return
+	}
+
+	// Distribute the mobile HMAC secret inside the encrypted package so the app
+	// can sign submission/telemetry requests. The server's mobileSecret is
+	// JwtSecret[:32], so embedding that exact value keeps signatures aligned.
+	if len(middleware.JwtSecret) >= 32 {
+		exam.HmacSecret = string(middleware.JwtSecret[:32])
 	}
 
 	encryptionKey := []byte(os.Getenv("ENCRYPTION_KEY"))

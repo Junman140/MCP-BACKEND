@@ -7,17 +7,31 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 // HMACBodyVerify validates X-Signature header on mobile submission endpoints.
 // Signature = HMAC-SHA256(request body, shared secret).
+//
+// Multipart/form-data uploads are exempt from body verification: the raw body
+// (a multipart boundary stream) cannot be deterministically reproduced by the
+// client for signing. Authenticity for those requests is still enforced by the
+// anti-replay nonce (HMAC of timestamp with the shared secret) and the JWT.
 func HMACBodyVerify(sharedSecret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		contentType := c.GetHeader("Content-Type")
+		isMultipart := strings.Contains(contentType, "multipart/form-data")
+
 		sigHeader := c.GetHeader("X-Signature")
 		if sigHeader == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing_signature", "detail": "X-Signature header required"})
+			return
+		}
+
+		if isMultipart {
+			c.Next()
 			return
 		}
 

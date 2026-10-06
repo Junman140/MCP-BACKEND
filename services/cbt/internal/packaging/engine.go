@@ -31,10 +31,9 @@ func PackageExam(exam models.Exam, mediaDir string, encryptionKey []byte) ([]byt
 		return nil, fmt.Errorf("failed to write exam_data.json: %w", err)
 	}
 
-	// 2. Add media files
-	for _, question := range exam.Questions {
+	// 2. Add media files (across flat questions, sections, and streams)
+	for _, question := range exam.AllQuestions() {
 		for _, mediaPath := range question.Media {
-			// In a real system, we'd ensure these are already WebP
 			fullPath := filepath.Join(mediaDir, mediaPath)
 			if err := addFileToZip(zipWriter, fullPath, mediaPath); err != nil {
 				return nil, fmt.Errorf("failed to add media %s: %w", mediaPath, err)

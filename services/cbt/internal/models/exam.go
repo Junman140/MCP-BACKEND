@@ -98,6 +98,11 @@ type Exam struct {
 	Semester          string          `bson:"semester,omitempty" json:"semester,omitempty"`
 	AcademicSessionID string          `bson:"academic_session_id,omitempty" json:"academic_session_id,omitempty"`
 	CreatedAt         time.Time       `bson:"created_at" json:"created_at"`
+
+	// HmacSecret is distributed to the mobile app inside the encrypted exam
+	// package so it can sign submission/telemetry requests. It is NOT persisted
+	// to the database (bson:"-").
+	HmacSecret string `bson:"-" json:"hmac_secret,omitempty"`
 }
 
 // AllQuestions returns every question regardless of how the exam is structured

@@ -15,9 +15,18 @@ if (!uri) {
 
 async function main() {
   await mongoose.connect(uri);
-  const email = process.env.SEED_SUPER_EMAIL ?? "super@example.edu";
-  const password = process.env.SEED_SUPER_PASSWORD ?? "ChangeMe123!";
-  const hash = await bcrypt.hash(password, 12);
+  const email = process.env.SEED_SUPER_EMAIL;
+  const password = process.env.SEED_SUPER_PASSWORD;
+  if (!email || !password) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("SEED_SUPER_EMAIL and SEED_SUPER_PASSWORD must be set when NODE_ENV=production");
+      process.exit(1);
+    }
+    console.warn("SEED_SUPER_* not set — falling back to insecure dev defaults (never do this in production)");
+  }
+  const seedEmail = email ?? "super@example.edu";
+  const seedPassword = password ?? "ChangeMe123!";
+  const hash = await bcrypt.hash(seedPassword, 12);
   await User.findOneAndUpdate(
     { email },
     {

@@ -8,7 +8,7 @@ const readRoles = [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.LECTURER];
 
 export async function lmsAnalyticsRoutes(app: FastifyInstance) {
   // At-risk students: those with <40% progress in any course
-  app.get("/analytics/at-risk", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get("/analytics/at-risk", { onRequest: [app.authenticate, requireRole(readRoles)] }, async (req, reply) => {
     const user = req.user as JwtUser;
     const tid = resolveTenantId(req, reply, user);
     if (!tid) return;
@@ -18,7 +18,7 @@ export async function lmsAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // Engagement per course: registration count vs progress
-  app.get("/analytics/engagement/:courseId", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get("/analytics/engagement/:courseId", { onRequest: [app.authenticate, requireRole(readRoles)] }, async (req, reply) => {
     const user = req.user as JwtUser;
     const tid = resolveTenantId(req, reply, user);
     if (!tid) return;
@@ -30,7 +30,7 @@ export async function lmsAnalyticsRoutes(app: FastifyInstance) {
   });
 
   // Grade distribution per course
-  app.get("/analytics/grade-distribution/:courseId", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get("/analytics/grade-distribution/:courseId", { onRequest: [app.authenticate, requireRole(readRoles)] }, async (req, reply) => {
     const user = req.user as JwtUser;
     const tid = resolveTenantId(req, reply, user);
     if (!tid) return;

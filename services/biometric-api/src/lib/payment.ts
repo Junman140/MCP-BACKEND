@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { Invoice, PaymentTransaction } from "../models/schemas.js";
 import { appendEntry } from "./ledger.js";
 import { enqueueRemittance } from "./jobs.js";
@@ -17,25 +17,32 @@ interface VirtualAccountResponse {
   reference: string;
 }
 
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
 function verifyPaystackWebhook(signature: string, body: string): boolean {
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret) return false;
   const hash = createHmac("sha512", secret).update(body).digest("hex");
-  return hash === signature;
+  return safeEqual(hash, signature);
 }
 
 function verifyFlutterwaveWebhook(signature: string, body: string): boolean {
   const secret = process.env.FLUTTERWAVE_SECRET_HASH;
   if (!secret) return false;
   const hash = createHmac("sha256", secret).update(body).digest("hex");
-  return hash === signature;
+  return safeEqual(hash, signature);
 }
 
 function verifyMonnifyWebhook(signature: string, body: string): boolean {
   const secret = process.env.MONNIFY_SECRET_KEY;
   if (!secret) return false;
   const hash = createHmac("sha512", secret).update(body).digest("hex");
-  return hash === signature;
+  return safeEqual(hash, signature);
 }
 
 export function verifyWebhook(provider: string, signature: string, body: string): boolean {
@@ -331,6 +338,16 @@ async function finalizePayment(args: {
   const idempotencyKey = `inbound-${transactionRef}`;
   const existing = await PaymentTransaction.findOne({ idempotencyKey });
   if (existing) return { processed: false, reason: "duplicate webhook (idempotency key exists)" };
+
+  // Verify the settled amount covers the invoice. Webhooks from a real PSP
+  // must not mark a larger invoice COLLECTED by paying a smaller amount.
+  const invoiceAmount = (invoice.totalAmount as number) ?? (invoice.amount as number);
+  if (typeof invoiceAmount === "number" && typeof amount === "number" && amount + 0.01 < invoiceAmount) {
+    return {
+      processed: false,
+      reason: `amount mismatch: webhook ${amount} < invoice ${invoiceAmount}`,
+    };
+  }
 
   await PaymentTransaction.create({
     tenantId: invoice.tenantId,

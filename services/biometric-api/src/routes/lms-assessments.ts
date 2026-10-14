@@ -53,6 +53,15 @@ export async function lmsAssessmentsRoutes(app: FastifyInstance) {
     const courseId = (req.query as { courseId?: string }).courseId;
     if (courseId) filter.courseId = courseId;
     const rows = await Quiz.find(filter).sort({ createdAt: -1 }).lean();
+    // Students must never receive the answer key.
+    if (user.role === Role.STUDENT) {
+      return withIds(
+        (rows as unknown as { _id: string; questions?: Record<string, unknown>[] }[]).map((q) => ({
+          ...q,
+          questions: (q.questions ?? []).map(({ correctAnswer: _omit, ...rest }) => rest),
+        }))
+      );
+    }
     return withIds(rows as { _id: string }[]);
   });
 

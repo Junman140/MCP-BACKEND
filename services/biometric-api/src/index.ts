@@ -45,8 +45,27 @@ await connectDb();
 
 const app = Fastify({ logger: true });
 
+const corsOrigins = (
+  process.env.CORS_ORIGINS ??
+  "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:81," +
+    "https://admin.memeclawai.com,https://student.memeclawai.com,https://lecturer.memeclawai.com"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 await app.register(cors, {
-  origin: true,
+  origin(origin, cb) {
+    // No Origin header → same-origin / server-to-server / curl — allow.
+    if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+});
+
+app.addHook("onSend", async (_req, reply) => {
+  reply.header("X-Content-Type-Options", "nosniff");
+  reply.header("X-Frame-Options", "DENY");
+  reply.header("Referrer-Policy", "no-referrer");
 });
 
 const jwtSecret = process.env.JWT_SECRET;

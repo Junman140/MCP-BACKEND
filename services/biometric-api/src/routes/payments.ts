@@ -193,6 +193,12 @@ export async function paymentRoutes(app: FastifyInstance) {
       onRequest: [app.authenticate, requireRole([Role.STUDENT, Role.SUPER_ADMIN, Role.TENANT_ADMIN])],
     },
     async (req, reply) => {
+      // Mock gateway is a demo convenience only. Disable it whenever a real
+      // PSP is configured, and always in production, so students cannot
+      // self-mark invoices COLLECTED.
+      if (process.env.PSP_PROVIDER !== "mock" || process.env.NODE_ENV === "production") {
+        return reply.code(404).send({ error: "Not found" });
+      }
       const user = req.user as JwtUser;
       const tid = resolveTenantId(req, reply, user);
       if (!tid) return;

@@ -46,7 +46,9 @@ export async function lmsForumsRoutes(app: FastifyInstance) {
     if (!tid) return;
     const forumId = (req.params as { id: string }).id;
     const body = PostBody.parse(req.body);
-    const p = await DiscussionPost.create({ ...body, tenantId: tid, forumId, authorId: body.authorId ?? user.sub, authorName: body.authorName ?? "User" });
+    // Identity always comes from the verified token; the client-supplied
+    // authorId is ignored so posts cannot be spoofed onto other users.
+    const p = await DiscussionPost.create({ ...body, tenantId: tid, forumId, authorId: user.sub, authorName: body.authorName ?? "User" });
     return withId(p.toObject() as { _id: string });
   });
 

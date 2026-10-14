@@ -12,7 +12,7 @@ const readRoles = [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.LECTURER, Role.VIEW
 const writeRoles = [Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.LECTURER];
 
 export async function lmsAttendanceRoutes(app: FastifyInstance) {
-  app.get("/attendance/sessions", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.get("/attendance/sessions", { onRequest: [app.authenticate, requireRole(readRoles)] }, async (req, reply) => {
     const user = req.user as JwtUser;
     const tid = resolveTenantId(req, reply, user);
     if (!tid) return;
@@ -78,6 +78,12 @@ export async function lmsAttendanceRoutes(app: FastifyInstance) {
     const sessionIds = [...new Set(records.map(r => r.sessionId))];
     const sessions = await AttendanceSession.find({ _id: { $in: sessionIds }, tenantId: tid }).lean();
     const sessionMap = new Map(sessions.map(s => [s._id as string, s]));
-    return records.map(r => ({ ...r, session: sessionMap.get(r.sessionId as string) ?? null, id: r._id }));
+    // Strip the live QR code from the student feed — check-in must go through
+    // the QR shown in class, not be readable from any student's API response.
+    return records.map(r => {
+      const s = sessionMap.get(r.sessionId as string) ?? null;
+      const { qrCode: _omitQr, qrExpiresAt: _omitExp, ...safeSession } = (s ?? {}) as Record<string, unknown>;
+      return { ...r, session: s ? safeSession : null, id: r._id };
+    });
   });
 }
